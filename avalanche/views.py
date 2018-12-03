@@ -1785,7 +1785,7 @@ def geojsonadd_avalancherisk(response):
 	boundary = response['source']['GeoJson']
 	response['source']['adm_lc_dict'] = {v['code']:v for v in response['source']['adm_lc']}
 
-	for k,v in enumerate(boundary['features']):
+	for k,v in enumerate(boundary.get('features',[])):
 		boundary['features'][k]['properties'] = prop = dict_ext(boundary['features'][k]['properties'])
 
 		# Checking if it's in a district
@@ -1810,7 +1810,7 @@ def geojsonadd_avalancheforecast(response):
 	boundary = response['source']['GeoJson']
 	avalancheforecast['adm_likelihood_dict'] = {v['code']:v for v in avalancheforecast['adm_likelihood']}
 
-	for k,v in enumerate(boundary['features']):
+	for k,v in enumerate(boundary.get('features',[])):
 		boundary['features'][k]['properties'] = prop = dict_ext(boundary['features'][k]['properties'])
 
 		# Checking if it's in a district
