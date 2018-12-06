@@ -1,1 +1,213 @@
 {% extends "dashboard_base.html" %}
+{% load i18n %}
+{% load base_tags %}
+{% load app_filters %}
+
+{% block dashboard_breadcrumb %} 
+    <a href="{% url "dashboard_detail" %}?page=avalancherisk" class="breadcrumb">{% trans "Avalanche Risk" %}</a>
+    {% include "links_title.html" %}
+{% endblock dashboard_breadcrumb %}
+
+{% block dashboard_content %}
+    <div class="row">
+        {% include "qlink_list.html" %}
+    </div>
+
+    <div class="row">
+        <div class="col s12">
+            <div class="card">
+                <div class="card-content">
+                    <span class="card-title">
+                        {% trans "Map" %}
+                    </span>
+                    <div class="row">
+                        <div class="col s12 l3 xl2">
+                            <div id="layercontrol">
+                                <div class="input-field">
+                                    <select id="ariskOpt">
+                                        <option value="arisk_checkbox_pop">Population at Avalanches Risk</option>
+                                        <option value="arisk_checkbox_build">Building at Avalanches Risk</option>
+                                        <option value="arisk_checkbox_area">Area at Avalanches Risk</option>
+                                    </select>
+                                    <label for="ariskOpt">Choose Layer :</label>
+                                </div>
+
+                                <div class="input-field">
+                                    <span>WMS Layer</span>
+                                    <div class="switch right">
+                                        <label>
+                                            <input type="checkbox" data-type=wms data-layer=arisk checked>
+                                            <span class="lever"></span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <label for="lvl">Choose Level :</label>
+                                <div id="lvl" class="lvl_choice">
+                                    <div class="row arisk_checkbox_pop arisk_opt">
+                                        <div class="col s12">
+                                            <label>
+                                                <input type="checkbox" name="arisk_checkbox" class="filled-in" value="med_ava_population">
+                                                <span>Moderate</span>
+                                            </label>
+                                        </div>
+                                        <div class="col s12">
+                                            <label>
+                                                <input type="checkbox" name="arisk_checkbox" class="filled-in" value="high_ava_population">
+                                                <span>High</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div style='display:none;' class="row arisk_checkbox_build arisk_opt">
+                                        <div class="col s12">
+                                            <label>
+                                                <input type="checkbox" name="arisk_checkbox" class="filled-in" value="med_ava_buildings">
+                                                <span>Moderate</span>
+                                            </label>
+                                        </div>
+                                        <div class="col s12">
+                                            <label>
+                                                <input type="checkbox" name="arisk_checkbox" class="filled-in" value="high_ava_buildings">
+                                                <span>High</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div style='display:none;' class="row arisk_checkbox_area arisk_opt">
+                                        <div class="col s12">
+                                            <label>
+                                                <input type="checkbox" name="arisk_checkbox" class="filled-in" value="med_ava_area">
+                                                <span>Moderate</span>
+                                            </label>
+                                        </div>
+                                        <div class="col s12">
+                                            <label>
+                                                <input type="checkbox" name="arisk_checkbox" class="filled-in" value="high_ava_area">
+                                                <span>High</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <label for="themes">Pick a theme :</label>
+                                <div id="themes">
+                                    <button class="theme active" data-btn="YlOrRd"></button>
+                                    <button class="theme" data-btn="PuRd"></button>
+                                    <button class="theme" data-btn="GnBu"></button>
+                                    <button class="theme" data-btn="Blues"></button>
+                                    <button class="theme" data-btn="BuGn"></button>
+                                    <button class="theme" data-btn="BuPu"></button>
+                                    <button class="theme" data-btn="Greens"></button>
+                                    <button class="theme" data-btn="Greys"></button>
+                                    <button class="theme" data-btn="Oranges"></button>
+                                    <button class="theme" data-btn="OrRd"></button>
+                                    <button class="theme" data-btn="PuBu"></button>
+                                    <button class="theme" data-btn="PuBuGn"></button>
+                                    <button class="theme" data-btn="Purples"></button>
+                                    <button class="theme" data-btn="RdPu"></button>
+                                    <button class="theme" data-btn="Reds"></button>
+                                    <button class="theme" data-btn="YlGn"></button>
+                                    <button class="theme" data-btn="YlGnBu"></button>
+                                    <button class="theme" data-btn="YlOrBr"></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col s12 l9 xl6">
+                            <div id="" class="map-size"></div>
+                        </div>
+                        <div class="col s12 l12 xl4">
+                            <div id="mapInfo"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col s12 m6 xl4">
+            <div class="card card-graph">
+                <div class="card-header red darken-3 white-text z-depth-2">
+                    <span class="card-title">{% trans "Avalanche Risk Population" %}</span>
+                    <i class="icon-people_affected_population left"></i>
+                    <span class="card-title right">{% readable panels.pop_likelihood.total_atrisk %}</span>
+                </div>
+                <div class="card-image">
+                    <div id="chart_pie_arisk_pop" class="ch-size donut-chart" data-color=colorFloodRisk data-val='{{ panels.pop_likelihood.child | jsonify | safe }}'></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col s12 m6 xl4">
+            <div class="card card-graph">
+                <div class="card-header red darken-3 white-text z-depth-2">
+                    <span class="card-title">{% trans "Avalanche Risk Building" %}</span>
+                    <i class="icon-infrastructure_building left"></i>
+                    <span class="card-title right">{% readable panels.building_likelihood.total_atrisk %}</span>
+                </div>
+                <div class="card-image">
+                    <div id="chart_pie_frisk_build" class="ch-size donut-chart" data-color=colorFloodRisk data-val='{{ panels.building_likelihood.child | jsonify | safe }}'></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col s12 m6 offset-m3 xl4">
+            <div class="card card-graph">
+                <div class="card-header red darken-3 white-text z-depth-2">
+                    <span class="card-title">{% trans "Avalanche Risk Area" %}</span>
+                    <i class="fa fa-tree left"></i>
+                    <span class="card-title right">{% readable panels.area_likelihood.total_atrisk %}</span>
+                </div>
+                <div class="card-image">
+                    <div id="chart_pie_frisk_area" class="ch-size donut-chart" data-color=colorFloodRisk data-val='{{ panels.area_likelihood.child | jsonify | safe }}'></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col s12">
+            <div class="card">
+                <div class="card-content">
+                    <span class="card-title">
+                        {% trans 'Population and Area of Avalanche Risk' %}
+                    </span>
+                    <p>{% trans 'Population estimated to be living in buildings within avalanche areas (avalanche trigger, avalanche chute and run-out areas). The avalanche areas were only computed for areas which had snow cover of the past 9 years. The trigger areas were calculated using established methodologies' %}.</p>
+                    <div class="table-responsive-scroll">
+                        <table class="striped highlight online">
+                            <thead>
+                                <tr>
+                                    <th rowspan="3">{% trans "Region" %}</th>
+                                    <th colspan="6">{% trans 'Avalanche Risk Level' %}</th>
+                                    <th  rowspan="2" colspan="3">{% trans "Total" %}</th>
+                                </tr>
+                                <tr>
+                                    <th colspan="3">{% trans "High" %}</th>
+                                    <th colspan="3">{% trans "Moderate" %}</th>
+                                </tr>
+                                <tr>
+                                    <th class="hum">{% trans "Pop" %}</th>
+                                    <th class="hum">{% trans "Building" %}</th>
+                                    <th class="hum">{% trans "Area" %} ({% blocktrans %}km<sup>2</sup>{% endblocktrans %})</th>
+                                    <th class="hum">{% trans "Pop" %}</th>
+                                    <th class="hum">{% trans "Building" %}</th>
+                                    <th class="hum">{% trans "Area" %} ({% blocktrans %}km<sup>2</sup>{% endblocktrans %})</th>
+                                    <th class="hum">{% trans "Pop" %}</th>
+                                    <th class="hum">{% trans "Building" %}</th>
+                                    <th class="hum">{% trans "Area" %} ({% blocktrans %}km<sup>2</sup>{% endblocktrans %})</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for parent in panels.adm_likelihood_pop_building_area.parentdata %}
+                                    <td class="boldRow">{{parent}}</td>
+                                {% endfor %}
+                                {% for child in panels.adm_likelihood_pop_building_area.child %}
+                                    <tr class="selectable" onclick="window.document.location='?page=avalancherisk&code={{child.code}}';">
+                                        {% for item in child.value %}
+                                            <td>{{item}}</td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
