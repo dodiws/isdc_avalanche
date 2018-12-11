@@ -63,20 +63,6 @@
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <label for="slideRange">Range :</label>
-                                <div id="slideRange">
-                                    <div id="keypress"></div>
-                                    <br>
-                                    <div class="row">
-                                        <div class="input-field col s12 l6">
-                                            <input type="text" id="input-with-keypress-0" class="">
-                                        </div>
-                                        <div class="input-field col s12 l6">
-                                            <input type="text" id="input-with-keypress-1" class="">
-                                        </div>
-                                    </div>
-                                </div>
 
                                 <label for="themes">Pick a theme :</label>
                                 <div id="themes">
@@ -103,7 +89,7 @@
                             </div>
                         </div>
                         <div class="col s12 l9 xl6">
-                            <div id="leaflet_avarisk_map" class="map-size"></div>
+                            <div id="leaflet_aforecast_map" class="map-size"></div>
                         </div>
                         <div class="col s12 l12 xl4">
                             <div id="mapInfo"></div>
@@ -182,4 +168,11 @@
             </div>
         </div>
     </div>
+{% endblock %}
+{% block extra_script %}
+    <script>
+        var centroid = boundary['centroid'];
+        var chosen_label = '{{parent_label}}';
+        var aforecast_cat = ['{% trans "Low Risk" %}', '{% trans "Medium Risk" %}', '{% trans "High Risk" %}', '{% trans "Not at Risk" %}' ];
+    </script>
 {% endblock %}

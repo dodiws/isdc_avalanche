@@ -112,7 +112,7 @@
                             </div>
                         </div>
                         <div class="col s12 l9 xl6">
-                            <div id="" class="map-size"></div>
+                            <div id="leaflet_avarisk_map" class="map-size"></div>
                         </div>
                         <div class="col s12 l12 xl4">
                             <div id="mapInfo"></div>
@@ -130,7 +130,7 @@
                     <span class="card-title right">{% readable panels.pop_likelihood.total_atrisk %}</span>
                 </div>
                 <div class="card-image">
-                    <div id="chart_pie_arisk_pop" class="ch-size donut-chart" data-color=colorFloodRisk data-val='{{ panels.pop_likelihood.child | jsonify | safe }}'></div>
+                    <div id="chart_pie_arisk_pop" class="ch-size donut-chart" data-color=colorAvaRisk data-val='{{ panels.pop_likelihood.child | jsonify | safe }}'></div>
                 </div>
             </div>
         </div>
@@ -143,7 +143,7 @@
                     <span class="card-title right">{% readable panels.building_likelihood.total_atrisk %}</span>
                 </div>
                 <div class="card-image">
-                    <div id="chart_pie_frisk_build" class="ch-size donut-chart" data-color=colorFloodRisk data-val='{{ panels.building_likelihood.child | jsonify | safe }}'></div>
+                    <div id="chart_pie_frisk_build" class="ch-size donut-chart" data-color=colorAvaRisk data-val='{{ panels.building_likelihood.child | jsonify | safe }}'></div>
                 </div>
             </div>
         </div>
@@ -156,7 +156,7 @@
                     <span class="card-title right">{% readable panels.area_likelihood.total_atrisk %}</span>
                 </div>
                 <div class="card-image">
-                    <div id="chart_pie_frisk_area" class="ch-size donut-chart" data-color=colorFloodRisk data-val='{{ panels.area_likelihood.child | jsonify | safe }}'></div>
+                    <div id="chart_pie_frisk_area" class="ch-size donut-chart" data-color=colorAvaRisk data-val='{{ panels.area_likelihood.child | jsonify | safe }}'></div>
                 </div>
             </div>
         </div>
@@ -210,4 +210,12 @@
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block extra_script %}
+    <script>
+        var centroid = boundary['centroid'];
+        var chosen_label = '{{parent_label}}';
+        var arisk_cat = ['{% trans "Moderate Risk" %}', '{% trans "High Risk" %}', '{% trans "Not at Risk" %}' ];
+    </script>
 {% endblock %}
