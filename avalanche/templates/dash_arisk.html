@@ -15,11 +15,13 @@
 
     <div class="row">
         <div class="col s12">
-            <div class="card">
-                <div class="card-content">
+            <div class="card card-dashboard">
+                <div class="card-header red darken-2 white-text">
                     <span class="card-title">
                         {% trans "Map" %}
                     </span>
+                </div>
+                <div class="card-content">
                     <div class="row">
                         <div class="col s12 l3 xl2">
                             <div id="layercontrol">
@@ -180,14 +182,16 @@
         </div>
         
         <div class="col s12">
-            <div class="card">
-                <div class="card-content">
+            <div class="card card-dashboard">
+                <div class="card-header red darken-2 white-text">
                     <span class="card-title">
                         {% trans 'Population and Area of Avalanche Risk' %}
                     </span>
+                </div>
+                <div class="card-content">
                     <p>{% trans 'Population estimated to be living in buildings within avalanche areas (avalanche trigger, avalanche chute and run-out areas). The avalanche areas were only computed for areas which had snow cover of the past 9 years. The trigger areas were calculated using established methodologies' %}.</p>
                     <div class="table-responsive-scroll">
-                        <table class="striped highlight online">
+                        <table class="highlight online">
                             <thead>
                                 <tr>
                                     <th rowspan="3">{% trans "Region" %}</th>
