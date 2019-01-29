@@ -1,0 +1,6 @@
+{% with chart=data.panels.avalancherisk.pop_likelihood color="colorAccess" colorpoint="true" %}
+{% include "dash_chart_donut.html" with title=chart.title icon="icon-people_affected_population" key="avalancherisk_pop_likelihood" values=chart.child total_atrisk=chart.total_atrisk total=chart.total %}
+{% endwith %}
+{% with chart=data.panels.avalancheforecast.pop_likelihood color="colorAccess" colorpoint="true" %}
+{% include "dash_chart_donut.html" with title=chart.title icon="icon-people_affected_population" key="avalancheforecast_pop_likelihood" values=chart.child total_atrisk=chart.total_atrisk total=chart.total %}
+{% endwith %}

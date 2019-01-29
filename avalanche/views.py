@@ -56,7 +56,7 @@ from geodb.views import (
 from django.db import connection, connections
 from django.db.models import Count, Sum
 from geonode.maps.views import _resolve_map, _PERMISSION_MSG_VIEW
-from geonode.utils import include_section, none_to_zero, query_to_dicts, RawSQL_nogroupby, ComboChart, merge_dict, div_by_zero_is_zero, dict_ext
+from geonode.utils import include_section, none_to_zero, query_to_dicts, RawSQL_nogroupby, ComboChart, merge_dict, div_by_zero_is_zero, dict_ext, linenum
 from matrix.models import matrix
 from pprint import pprint
 from pytz import timezone, all_timezones
@@ -82,6 +82,9 @@ import gzip
 import os
 import subprocess
 from geodb.enumerations import HEALTHFAC_TYPES, LANDCOVER_TYPES, AVA_LIKELIHOOD_INDEX, AVA_LIKELIHOOD_TYPES, AVA_LIKELIHOOD_INVERSE, AVA_LIKELIHOOD_INDEX
+from django.conf.urls import url
+from tastypie.utils import trailing_slash
+from tastypie.authentication import BasicAuthentication, SessionAuthentication, OAuthAuthentication
 
 def get_dashboard_meta(*args,**kwargs):
 	# if page_name in ['avalancheforecast', 'avalcheforecast']:
@@ -110,26 +113,30 @@ def get_dashboard_meta(*args,**kwargs):
 
 # from geodb.geo_calc
 
-def getAvalancheForecast(request, filterLock, flag, code, includes=[], excludes=[], date=''):
-	response = dict_ext()
+def getAvalancheForecast(request, filterLock, flag, code, includes=[], excludes=[], date='', response=dict_ext()):
+	# response = dict_ext()
 	targetBase = AfgLndcrva.objects.all()
 	
-	# FIXME: use values from provincesummary
-	response['baseline'] = getBaseline(request, filterLock, flag, code, includes=['pop_lc','building_lc'])
-	response['avalancherisk'] = getRawAvalancheRisk(filterLock, flag, code)
+	# FIXME: use values from provincesummary but only after building data present
+	response['baseline'] = response.pathget('cache','getBaseline','baseline') or getBaseline(request, filterLock, flag, code, includes=['pop_lc','building_lc'])
+	response['avalancherisk'] = response.pathget('cache','getBaseline','avalancherisk') or getRawAvalancheRisk(filterLock, flag, code)
+
+	# because building data not in provincesummary yet
+	# response['avalancheforecast'] = response.pathget('cache','getBaseline','avalancheforecast') or getRawAvalancheForecast(request, filterLock, flag, code, date)
 	response['avalancheforecast'] = getRawAvalancheForecast(request, filterLock, flag, code, date)
 
 	response.path('avalancheforecast')['pop_forecast_percent'] = {k:round(div_by_zero_is_zero(v, response['baseline']['pop_total'])*100, 0) for k,v in response['avalancheforecast']['pop_likelihood'].items()}
 	response.path('avalancheforecast')['pop_forecast_percent_total'] = sum(response['avalancheforecast']['pop_forecast_percent'].values())
 
-	if 'date' not in request.GET:
-		response.path('avalancheforecast')['adm_likelihood'] = getProvinceSummary(filterLock, flag, code)
+	if include_section('adm_likelihood', includes, excludes):
+		if 'date' not in request.GET:
+			response.path('avalancheforecast')['adm_likelihood'] = getProvinceSummary(filterLock, flag, code)
 
-		for i in response.path('avalancheforecast')['adm_likelihood']:
-			i['total_pop_forecast_percent'] = int(round(i['total_ava_forecast_pop']/i['Population']*100,0))
-			i['high_pop_forecast_percent'] = int(round(i['ava_forecast_high_pop']/i['Population']*100,0))
-			i['med_pop_forecast_percent'] = int(round(i['ava_forecast_med_pop']/i['Population']*100,0))
-			i['low_pop_forecast_percent'] = int(round(i['ava_forecast_low_pop']/i['Population']*100,0))
+			for i in response.path('avalancheforecast')['adm_likelihood']:
+				i['total_pop_forecast_percent'] = int(round(i['total_ava_forecast_pop']/i['Population']*100,0))
+				i['high_pop_forecast_percent'] = int(round(i['ava_forecast_high_pop']/i['Population']*100,0))
+				i['med_pop_forecast_percent'] = int(round(i['ava_forecast_med_pop']/i['Population']*100,0))
+				i['low_pop_forecast_percent'] = int(round(i['ava_forecast_low_pop']/i['Population']*100,0))
 
 	if include_section('GeoJson', includes, excludes):
 		response['GeoJson'] = getGeoJson(request, flag, code)
@@ -321,13 +328,13 @@ def getRawAvalancheForecast(request, filterLock, flag, code, date=''):
 
 	return response
 
-def getAvalancheRisk(request, filterLock, flag, code, includes=[], excludes=[]):
-	response = dict_ext()
+def getAvalancheRisk(request, filterLock, flag, code, includes=[], excludes=[], response=dict_ext()):
+	# response = dict_ext()
 
 	targetBase = AfgLndcrva.objects.all()
 
 	# TODO: add avalanche risk building data to provincesummary
-	response['baseline'] = getBaseline(request, filterLock, flag, code, includes=['pop_lc','building_lc'])
+	response['baseline'] = response.pathget('cache','getBaseline','baseline') or getBaseline(request, filterLock, flag, code, includes=['pop_lc','building_lc'])
 	# if flag not in ['entireAfg','currentProvince']:
 	#     response['Population']=getTotalPop(filterLock, flag, code, targetBase)
 	#     response['Area']=getTotalArea(filterLock, flag, code, targetBase)
@@ -340,7 +347,7 @@ def getAvalancheRisk(request, filterLock, flag, code, includes=[], excludes=[]):
 	#     response['Buildings']= tempData['total_buildings']
 	#     response['settlement']= tempData['settlements']
 
-	response['avalancherisk'] = getRawAvalancheRisk(filterLock, flag, code)
+	response['avalancherisk'] = response.pathget('cache','getBaseline','avalancherisk') or getRawAvalancheRisk(filterLock, flag, code)
 	# rawAvalancheRisk = getRawAvalancheRisk(filterLock, flag, code)
 	# for i in rawAvalancheRisk:
 	#     response[i]=rawAvalancheRisk[i]
@@ -399,8 +406,8 @@ def getAvalancheRisk(request, filterLock, flag, code, includes=[], excludes=[]):
 
 	response['adm_lc']=data
 
-	#if include_section('GeoJson', includes, excludes):
-	response['GeoJson'] = getGeoJson(request, flag, code)
+	if include_section('GeoJson', includes, excludes):
+		response['GeoJson'] = getGeoJson(request, flag, code)
 
 	return response
 
@@ -1638,6 +1645,95 @@ def getSnowVillage(request):
 	return render_to_response(template,
 								  RequestContext(request, context_dict))
 
+def getSnowVillageCommon(village):
+	# template = './snowInfo.html'
+	# village = request.GET["v"]
+	context_dict = getCommonVillageData(village)
+	currentdate = datetime.datetime.utcnow()
+	year = currentdate.strftime("%Y")
+	month = currentdate.strftime("%m")
+	day = currentdate.strftime("%d")
+
+	# print context_dict
+
+	snowCal = AfgSnowaAverageExtent.objects.all().filter(dist_code=context_dict['dist_code'])
+	snowCal = snowCal.filter(wkb_geometry__contains=context_dict['position'])
+
+
+	cursor = connections['geodb'].cursor()
+	sql = "\
+		select b.ogc_fid, b.value, c.riskstate, a.wkb_geometry \
+		from current_sc_basins a \
+		inner join afg_sheda_lvl4 b on a.basin=b.value \
+		left outer join forcastedvalue c on b.ogc_fid=c.basin_id and c.forecasttype = 'snowwaterreal' and c.datadate = NOW()::date \
+		where st_intersects(ST_GeomFromText('"+context_dict['position'].wkt+"', 4326), a.wkb_geometry)\
+	"
+	print linenum() ,sql
+	cursor.execute(sql)
+	currSnow = cursor.fetchall()
+	cursor.close()
+
+	# currSnow = AfgShedaLvl4.objects.all().filter(wkb_geometry__contains=context_dict['position']).select_related("basins").filter(basins__datadate=year+'-'+month+'-'+day,basins__forecasttype='snowwaterreal').values('basins__riskstate')
+	tempDepth = None
+	for i in currSnow:
+		tempDepth = i[2]
+		if tempDepth == None :
+			tempDepth = 1
+
+	if tempDepth > 0 and tempDepth <=10:
+		context_dict['current_snow_depth'] = 'Snow cover, no info on depth'
+	elif tempDepth > 10 and tempDepth <=25:
+		context_dict['current_snow_depth'] = '5cm - 25cm'
+	elif tempDepth > 25 and tempDepth <=50:
+		context_dict['current_snow_depth'] = '15cm - 50cm'
+	elif tempDepth > 50 and tempDepth <=100:
+		context_dict['current_snow_depth'] = '25cm - 1m'
+	elif tempDepth > 100 and tempDepth <=150:
+		context_dict['current_snow_depth'] = '50cm - 1.5m'
+	elif tempDepth > 150 and tempDepth <=200:
+		context_dict['current_snow_depth'] = '75cm - 2m'
+	elif tempDepth > 200:
+		context_dict['current_snow_depth'] = '> 1m - 2m'
+	else:
+		context_dict['current_snow_depth'] = 'not covered by snow'
+	# Forcastedvalue.objects.all().filter(datadate=year+'-'+month+'-'+day,forecasttype='flashflood',basin=basin)
+	# targetAvalanche.select_related("basinmembersava").exclude(basinmember__basins__riskstate=None).filter(basinmember__basins__forecasttype='snowwater',basinmember__basins__datadate='%s-%s-%s' %(YEAR,MONTH,DAY))
+	data1 = []
+	data1.append([_('Month'),'Snow_Cover'])
+	i = next(iter(snowCal or []), None) # get first item or None
+	data1.append([_('Jan'),getSnowCoverClassNumber(getattr(i, 'cov_01_jan', None))])
+	data1.append([_('Feb'),getSnowCoverClassNumber(getattr(i, 'cov_02_feb', None))])
+	data1.append([_('Mar'),getSnowCoverClassNumber(getattr(i, 'cov_03_mar', None))])
+	data1.append([_('Apr'),getSnowCoverClassNumber(getattr(i, 'cov_04_apr', None))])
+	data1.append([_('May'),getSnowCoverClassNumber(getattr(i, 'cov_05_may', None))])
+	data1.append([_('Jun'),getSnowCoverClassNumber(getattr(i, 'cov_06_jun', None))])
+	data1.append([_('Jul'),getSnowCoverClassNumber(getattr(i, 'cov_07_jul', None))])
+	data1.append([_('Aug'),getSnowCoverClassNumber(getattr(i, 'cov_08_aug', None))])
+	data1.append([_('Sep'),getSnowCoverClassNumber(getattr(i, 'cov_09_sep', None))])
+	data1.append([_('Oct'),getSnowCoverClassNumber(getattr(i, 'cov_10_oct', None))])
+	data1.append([_('Nov'),getSnowCoverClassNumber(getattr(i, 'cov_11_nov', None))])
+	data1.append([_('Dec'),getSnowCoverClassNumber(getattr(i, 'cov_12_dec', None))])
+	# for i in snowCal:
+	# 	data1.append([_('Jan'),getSnowCoverClassNumber(i.cov_01_jan)])
+	# 	data1.append([_('Feb'),getSnowCoverClassNumber(i.cov_02_feb)])
+	# 	data1.append([_('Mar'),getSnowCoverClassNumber(i.cov_03_mar)])
+	# 	data1.append([_('Apr'),getSnowCoverClassNumber(i.cov_04_apr)])
+	# 	data1.append([_('May'),getSnowCoverClassNumber(i.cov_05_may)])
+	# 	data1.append([_('Jun'),getSnowCoverClassNumber(i.cov_06_jun)])
+	# 	data1.append([_('Jul'),getSnowCoverClassNumber(i.cov_07_jul)])
+	# 	data1.append([_('Aug'),getSnowCoverClassNumber(i.cov_08_aug)])
+	# 	data1.append([_('Sep'),getSnowCoverClassNumber(i.cov_09_sep)])
+	# 	data1.append([_('Oct'),getSnowCoverClassNumber(i.cov_10_oct)])
+	# 	data1.append([_('Nov'),getSnowCoverClassNumber(i.cov_11_nov)])
+	# 	data1.append([_('Dec'),getSnowCoverClassNumber(i.cov_12_dec)])
+
+	ticks = [{ 'v': 0, 'f': _('No Snow')}, {'v': 1, 'f': _('Very low')}, {'v': 2, 'f': _('Low')}, {'v': 3, 'f': _('Average')}, {'v': 4, 'f': _('High')}, {'v': 5, 'f': _('Very high')}]
+	context_dict['ticks'] = ticks
+	context_dict['snowcover_month_depth'] = data1
+	context_dict['snowcover_line_chart'] = gchart.LineChart(SimpleDataSource(data=data1), html_id="line_chart1", options={'title': _("Snow Cover Calendar"), 'width': 500,'height': 250, 'legend': 'none', 'curveType': 'function', 'vAxis': { 'ticks': ticks}})
+	context_dict.pop('position')
+	return context_dict
+
 def getSnowCoverClassNumber(x):
 	if x == 'Very low':
 		return 1
@@ -1652,15 +1748,9 @@ def getSnowCoverClassNumber(x):
 	else:
 		return 0
 
-def getQuickOverview(request, filterLock, flag, code, includes=[], excludes=[]):
-	response = {}
-	response.update(getRawAvalancheForecast(request, filterLock, flag, code))
-	response.update(getRawAvalancheRisk(filterLock, flag, code))
-	return response
+def dashboard_avalancherisk(request, filterLock, flag, code, includes=[], excludes=[], response=dict_ext()):
 
-def dashboard_avalancherisk(request, filterLock, flag, code, includes=[], excludes=[]):
-
-	response = dict_ext()
+	# response = dict_ext()
 
 	AVA_LIKELIHOOD_INDEX_EXC_LOW = {k:v for k,v in AVA_LIKELIHOOD_INDEX.items() if v is not 'low'}
 	# AVA_LIKELIHOOD_TYPES_EXC_LOW = {k:v for k,v in AVA_LIKELIHOOD_TYPES.items() if k is not 'low'}
@@ -1669,7 +1759,7 @@ def dashboard_avalancherisk(request, filterLock, flag, code, includes=[], exclud
 	if include_section('getCommonUse', includes, excludes):
 		response.update(getCommonUse(request, flag, code))
 
-	response['source'] = getAvalancheRisk(request, filterLock, flag, code)
+	response['source'] = response.pathget('cache','getAvalancheRisk') or getAvalancheRisk(request, filterLock, flag, code, response=response.within('cache'))
 	response['panels'] = panels = dict_ext()
 	baseline = response['source']['baseline']
 	avalancherisk = response['source']['avalancherisk']
@@ -1725,15 +1815,15 @@ def dashboard_avalancherisk(request, filterLock, flag, code, includes=[], exclud
 
 	return response
 
-def dashboard_avalancheforecast(request, filterLock, flag, code, includes=[], excludes=[], date=''):
+def dashboard_avalancheforecast(request, filterLock, flag, code, includes=[], excludes=[], date='', response=dict_ext()):
 
-	response = dict_ext()
+	# response = dict_ext()
 
 	if include_section('getCommonUse', includes, excludes):
 		response.update(getCommonUse(request, flag, code))
 
-	response['source'] = getAvalancheForecast(request, filterLock, flag, code, date)
-	response['panels'] = panels = dict_ext()
+	response['source'] = response.pathget('cache','getAvalancheForecast') or getAvalancheForecast(request, filterLock, flag, code, date=date)
+	panels = response.path('panels')
 	baseline = response['source']['baseline']
 	avalancheforecast = response['source']['avalancheforecast']
 	titles = {'pop':'Avalanche Prediction Population Graph','building':'Avalanche Prediction Building Graph'}
@@ -1741,14 +1831,14 @@ def dashboard_avalancheforecast(request, filterLock, flag, code, includes=[], ex
 
 	for p in ['pop','building']:
 		panels.path(p+'_likelihood')['title'] = titles[p]
-		panels.path(p+'_likelihood')['value'] = [avalancheforecast[p+'_likelihood'].get(d) or 0 for d in AVA_LIKELIHOOD_INDEX.values()]
-		panels.path(p+'_likelihood')['total_atrisk'] = total_atrisk = sum(panels.path(p+'_likelihood')['value'])
+		panels.path(p+'_likelihood')['value'] = [dict_ext(avalancheforecast).pathget(p+'_likelihood',d) or 0 for d in AVA_LIKELIHOOD_INDEX.values()]
+		panels.path(p+'_likelihood')['total_atrisk'] = total_atrisk = sum(panels.pathget(p+'_likelihood','value') or [])
 		panels.path(p+'_likelihood')['total'] = total = baseline[p+'_total']
 		panels.path(p+'_likelihood')['value'].append(total-total_atrisk) # value not at risk
 		panels.path(p+'_likelihood')['label'] = [AVA_LIKELIHOOD_TYPES[d] for d in AVA_LIKELIHOOD_INDEX.values()] + [_('Not at risk')]
-		# panels.path(p+'_likelihood')['percent'] = [avalancheforecast[p+'_likelihood_percent'].get(d) or 0 for d in AVA_LIKELIHOOD_INDEX.values()]
+		# panels.path(p+'_likelihood')['percent'] = [dict_ext(avalancheforecast).pathget(p+'_likelihood_percent',d) or 0 for d in AVA_LIKELIHOOD_INDEX.values()]
 		# panels.path(p+'_likelihood')['percent'].append(100-sum(panels.path(p+'_likelihood')['percent'])) # percent not at risk
-		panels.path(p+'_likelihood')['child'] = [[AVA_LIKELIHOOD_TYPES[d], avalancheforecast[p+'_likelihood'].get(d)] for d in AVA_LIKELIHOOD_INDEX.values()]
+		panels.path(p+'_likelihood')['child'] = [[AVA_LIKELIHOOD_TYPES[d], dict_ext(avalancheforecast).pathget(p+'_likelihood',d)] for d in AVA_LIKELIHOOD_INDEX.values()]
 		panels.path(p+'_likelihood')['child'].append([_('Not at risk'),total-total_atrisk]) # percent not at risk
 
 	if include_section('adm_likelihood', includes, excludes):
@@ -1943,11 +2033,11 @@ class AvalancheStatisticResource(ModelResource):
 
 def getAvalancheforecastStatistic(request,filterLock, flag, code, date):
 
-	panels = dashboard_avalancheforecast(request, filterLock, flag, code, date)['panels']
+	panels = dashboard_avalancheforecast(request, filterLock, flag, code, date=date)['panels']
 
 	panels_list = dict_ext()
 	panels_list['charts'] = [v for k,v in panels.items() if k in ['pop_likelihood','building_likelihood']]
-	panels['adm_likelihood']['child'] = panels['adm_likelihood']['parentdata'] + [v['value'] for v in panels['adm_likelihood']['child']]
+	# panels['adm_likelihood_pop_building_area']['child'] = panels['adm_likelihood_pop_building_area']['parentdata'] + [v['value'] for v in panels['adm_likelihood_pop_building_area']['child']]
 	panels_list['tables'] = [panels['adm_likelihood'],]
 
 	return panels_list
@@ -1955,8 +2045,80 @@ def getAvalancheforecastStatistic(request,filterLock, flag, code, date):
 def getAvalancheStatistic(request,filterLock, flag, code, date=None):
 
 	response = {
-		'avalancherisk': getAvalancheriskStatistic(request,filterLock, flag, code),
-		'avalancheforecast': getAvalancheforecastStatistic(request,filterLock, flag, code, date=date),
+		'panels_list':{
+			'avalancherisk': getAvalancheriskStatistic(request,filterLock, flag, code),
+			'avalancheforecast': getAvalancheforecastStatistic(request,filterLock, flag, code, date=date),
+		}
 	}
 
 	return response
+
+class SnowInfoVillages(Resource):
+
+	class Meta:
+		resource_name = 'snow'
+		authentication = SessionAuthentication()
+
+	def prepend_urls(self):
+		name = self._meta.resource_name
+		return [
+			url(r"^%s%s$" % (name, trailing_slash()), self.wrap_view('getdata'), name='get_%s'%(name)),
+		]
+
+	def getdata(self, request, **kwargs):
+		self.method_check(request, allowed=['get'])
+		self.is_authenticated(request)
+		self.throttle_check(request)
+
+		data = getSnowVillageCommon(request.GET.get('vuid'))
+
+		response = {
+			'panels_list':{
+				'tables':[
+					{
+						'key':'base_info',
+						'child':[
+							[_('District'),data.get('dist_na_en')],
+							[_('Province'),data.get('prov_na_en')],
+							[_('Elevation'),'{:,} m above sea level'.format(data.get('elevation'))],
+							[_('Approx. Current Snow Depth'),'{}'.format(data.get('current_snow_depth'))],
+						],
+					},
+				],
+				'charts':[
+					{
+						'key':'snow_cover_calendar',
+						'title':_('FloodSnow Cover Calendar'),
+						'columntitles':data['snowcover_month_depth'][0],
+						'child':data['snowcover_month_depth'][1:],
+						'y_axis_alias':[[l['v'],l['f']] for l in data['ticks']],
+					},
+				]
+			},
+		}
+
+		return self.create_response(request, response)
+
+def getQuickOverview(request, filterLock, flag, code, response=dict_ext()):
+	
+	response.path('cache')['getAvalancheRisk'] = response.pathget('cache','getAvalancheRisk') or getAvalancheRisk(request, filterLock, flag, code, includes=[''], response=response)
+	dashboard_avalancherisk_response = dashboard_avalancherisk(request, filterLock, flag, code, includes=[''], response=response.within('cache'))
+	
+	if response.pathget('cache','getBaseline','avalancheforecast'):
+		response.path('cache')['getAvalancheForecast'] = response.pathget('cache','getBaseline').within('baseline','avalancheforecast')
+	else:
+		response.path('cache')['getAvalancheForecast'] = getAvalancheForecast(request, filterLock, flag, code, includes=[''], response=response)
+	dashboard_avalancheforecast_response = dashboard_avalancheforecast(request, filterLock, flag, code, includes=[''], response=response.within('cache'))
+	
+	return {
+		'templates':{
+			'panels':'dash_qoview_avalanche.html',
+		},
+		'data':{
+			'panels':{
+				'avalancherisk':dict_ext(dashboard_avalancherisk_response).pathget('panels'),
+				'avalancheforecast':dict_ext(dashboard_avalancheforecast_response).pathget('panels'),
+			}
+		},
+	}
+	

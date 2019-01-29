@@ -1,0 +1,6 @@
+include LICENSE
+include VERSION
+include README.rst
+recursive-include avalanche/locale *
+recursive-include avalanche/templates *
+recursive-include avalanche/migrations *
